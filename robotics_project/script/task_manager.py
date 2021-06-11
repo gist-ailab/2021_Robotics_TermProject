@@ -31,6 +31,9 @@ from moveit_commander.conversions import pose_to_list
 
 import numpy as np
 import csv
+import os
+from os.path import join
+
 
 #=====================================
 #======    PARAMETER
@@ -84,9 +87,11 @@ TARGET_INFO = {
   "e": "object_3"
 }
 
-STORAGE_BOX_POSITION = [0, -1.75, 270] # x, y, angle
+STORAGE_BOX_POSITION = [0, -1.75, 270] # x, y, angle(GAZEBO)
+# STORAGE_BOX_POSITION = [0, 0, 135] # x, y, angle (REAL)
 
-
+SCRIPT_ROOT = os.path.dirname(os.path.abspath(__file__))
+XZ_WORKSPACE_FILE = join(SCRIPT_ROOT, "available_workspace.csv")
 
 def all_close(goal, actual, tolerance):
   """
@@ -122,8 +127,24 @@ class TurtleState:
   rpy = [0,0,0]
   is_stop = True
 
+class TargetBox:
+  box_1 = 1
+  box_2 = 2
+  box_3 = 3
+  box_4 = 4
+
+class GraspState:
+  upper_box_grasp = [0.3, 0, 0.3] # x, y, z
+  down_box_grasp = [0.3, 0, 0]
+  
+  left_box_approach = [0.2, 0.2]
+  right_box_approach = [0.2, -0.2]
+
+
+
+
 class RobotManager(object):
-  def __init__(self):
+  def __init__(self, localization=True):
     super(RobotManager, self).__init__()
     
     moveit_commander.roscpp_initialize(sys.argv)
@@ -174,19 +195,20 @@ class RobotManager(object):
     #======    Loading Turtelbot 
     #=====================================
     self.turtle_state = TurtleState()
-    
 
     # topic publisher
     self.turtle_cmd_pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
     # action client
     self.turtle_move_client = actionlib.SimpleActionClient('move_base',MoveBaseAction)
     
-    self.localization()
-
+    if localization==True:
+      self.localization()
+    else:
+      pass
   #region Manipulator
   def get_available_workspace(self):
     available_space = []
-    with open("available_workspace.csv", "r") as f:
+    with open(XZ_WORKSPACE_FILE, "r") as f:
       reader = csv.reader(f)
       for row in reader:
         available_space.append(map(float, row))
@@ -573,14 +595,14 @@ class CameraManager(object):
 
   def find_target_object(self, target_object):
     target_point = [0.3, 0.5, 0.3]
-    return 
+    return TargetBox.box_1
 
 def main():
   try:
     rospy.init_node('task_manager', anonymous=True)
     print(project_info_msg)
     print("============ 1. Initialize robot")
-    robot = RobotManager() # turtlebot with open manipulator
+    robot = RobotManager(localization=True) # turtlebot with open manipulator
     cam = CameraManager() # realsense
     while True:
       input("Press Enter to Continue the Project ")
@@ -596,13 +618,32 @@ def main():
 
       print("============ 4. Find Target Object")
       #TODO: Find Target objects x, y, z (or Grasp Point)
+      target_box = cam.find_target_object(target_object)
+      print("Find {} in {} Box".format(target_object, target_box))
 
-      target_point = cam.find_target_object(target_object)
-      print("Find {} in {}".format(target_object, target_point))
-      
       print("============ 5. Pick up Target Object")
       #TODO: approach to target object(until availbale to grasp)
+      input("Approach to Box {}".format(target_box))
+      if target_box in [1, 3]:
+        target_movement = GraspState.left_box_approach
+      else:
+        target_movement = GraspState.right_box_approach
+      robot.move_to_goal(goal_x=target_movement[0], 
+                         goal_y=target_movement[1],
+                         goal_angle=0,
+                         relate_frame=robot.planning_frame
+                         )
+
+      #TODO: Grasp pose
+      input("Set Manipulator to Grasp {} Box".format(target_box))
+      if target_box in [1, 2]:
+        target_point, _ = robot.get_nearest_available_point(GraspState.upper_box_grasp)
+      else:
+        target_point, _ = robot.get_nearest_available_point(GraspState.down_box_grasp)
+      robot.go_to_xyz_goal_with_constraint(target_point)
+
       #TODO: Grasp
+      robot.close_gripper()
       input("Press Enter to Continue the Project ")
 
       print("============ 6. Move to Customer")
