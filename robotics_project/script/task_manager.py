@@ -93,7 +93,7 @@ STORAGE_BOX_POSITION = [0, -1.75, 270] # x, y, angle(GAZEBO)
 SCRIPT_ROOT = os.path.dirname(os.path.abspath(__file__))
 XZ_WORKSPACE_FILE = join(SCRIPT_ROOT, "available_workspace.csv")
 
-def all_close(goal, actual, tolerance):
+def all_close(goal, actual, tolerance=0.01):
   """
   Convenience method for testing if the values in two lists are within a tolerance of each other.
   For Pose and PoseStamped inputs, the angle between the two quaternions is compared (the angle 
@@ -139,8 +139,6 @@ class GraspState:
   
   left_box_approach = [0.2, 0.2]
   right_box_approach = [0.2, -0.2]
-
-
 
 
 class RobotManager(object):
@@ -453,15 +451,14 @@ class RobotManager(object):
       lidar_distances = self.get_scan_data()
       min_distance = min(lidar_distances)
       if min_distance > SAFE_STOP_DISTANCE:
-        self.set_turtlebot_velocity(linear_velocity=[LINEAR_VEL,0,0],
-                                    angular_velocity=[0,0,0])
+        self.set_turtlebot_velocity(linear_velocity=LINEAR_VEL,
+                                    angular_velocity=0)
         while (t1 - t0) < 5:
           t1 = time.time()
           lidar_distances = self.get_scan_data()
           min_distance = min(lidar_distances)
           if min_distance < SAFE_STOP_DISTANCE:
-            self.set_turtlebot_velocity(linear_velocity=[0,0,0],
-                                        angular_velocity=[0,0,0])
+            self.turtle_stop()
             break
       else:
         pass
@@ -477,8 +474,8 @@ class RobotManager(object):
         angular_vel = -ANGULAR_VEL
       else:
         angular_vel = 0
-      self.set_turtlebot_velocity(linear_velocity=[0,0,0],
-                                  angular_velocity=[0,0,angular_vel])
+      self.set_turtlebot_velocity(linear_velocity=0,
+                                  angular_velocity=angular_vel)
       while True:
         self.turtle_state_update()
         delta_rad = self.turtle_state.rpy[2] - start_rad
@@ -526,12 +523,8 @@ class RobotManager(object):
 
   def set_turtlebot_velocity(self, linear_velocity, angular_velocity):
     twist = Twist()
-    twist.linear.x = linear_velocity[0]
-    twist.linear.y = linear_velocity[1]
-    twist.linear.z = linear_velocity[2]
-    twist.angular.x = angular_velocity[0]
-    twist.angular.y = angular_velocity[1]
-    twist.angular.z = angular_velocity[2]
+    twist.linear.x = linear_velocity
+    twist.angular.z = angular_velocity
     
     self.turtle_cmd_pub.publish(twist)
 
@@ -552,10 +545,18 @@ class RobotManager(object):
   def turtle_stop(self):
     self.turtle_state_update()
     while not self.turtle_state.is_stop:
-      self.set_turtlebot_velocity(linear_velocity=[0,0,0],
-                                  angular_velocity=[0,0,0])
+      self.set_turtlebot_velocity(linear_velocity=0,
+                                  angular_velocity=0)
       self.turtle_state_update()
-    
+  
+  def turtle_move(self, target_pose):
+    self.set_turtlebot_velocity(linear_velocity=0.1,
+                                angular_velocity=0)
+    while not all_close(target_pose, self.turtle_state.pose):
+      print(target_pose)
+      print(self.turtle_state.pose)
+      self.turtle_state_update()
+
   @staticmethod
   def get_scan_data():
     scan = rospy.wait_for_message('scan', LaserScan)
@@ -587,6 +588,7 @@ class RobotManager(object):
         scan_filter[i] = 0
     
     return scan_filter
+  
   #endregion
 
 class CameraManager(object):
@@ -602,8 +604,9 @@ def main():
     rospy.init_node('task_manager', anonymous=True)
     print(project_info_msg)
     print("============ 1. Initialize robot")
-    robot = RobotManager(localization=True) # turtlebot with open manipulator
+    robot = RobotManager(localization=False) # turtlebot with open manipulator
     cam = CameraManager() # realsense
+      
     while True:
       input("Press Enter to Continue the Project ")
       print("============ 2. Get Target Object Information from Customer")
@@ -654,6 +657,7 @@ def main():
       print("============ 7. Place Object to Customer Hand")
       #TODO: Find Hand and place object to customer
       input("Press Enter to Continue the Project ")
+
 
   except rospy.ROSInterruptException:
       return
