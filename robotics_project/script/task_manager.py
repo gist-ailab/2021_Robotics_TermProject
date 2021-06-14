@@ -87,8 +87,10 @@ TARGET_INFO = {
   "e": "object_3"
 }
 
-STORAGE_BOX_POSITION = [0, -1.75, 270] # x, y, angle(GAZEBO)
-# STORAGE_BOX_POSITION = [0, 0, 135] # x, y, angle (REAL)
+
+# STORAGE_BOX_POSITION = [0, -1.75, 270] # x, y, angle(GAZEBO)
+# STORAGE_BOX_POSITION = [0, 0, 0] # x, y, angle (REAL)
+STORAGE_BOX_POSITION_UWB = [3.715, 4.836, 0] # x, y, angle (UWB)
 
 SCRIPT_ROOT = os.path.dirname(os.path.abspath(__file__))
 XZ_WORKSPACE_FILE = join(SCRIPT_ROOT, "available_workspace.csv")
@@ -134,12 +136,16 @@ class TargetBox:
   box_4 = 4
 
 class GraspState:
-  upper_box_grasp = [0.3, 0, 0.3] # x, y, z
+  # manipulator (x, y, z)
+  upper_box_grasp = [0.32, 0, 0.3]
   down_box_grasp = [0.3, 0, 0]
-  
+
+  grasp_state = [0, 0, 0.2] 
+  place_state = [0.2, 0, 0.2]
+
+  # turtle
   left_box_approach = [0.2, 0.2]
   right_box_approach = [0.2, -0.2]
-
 
 class RobotManager(object):
   def __init__(self, localization=True):
@@ -188,7 +194,7 @@ class RobotManager(object):
 
     self.available_workspace = self.get_available_workspace()
     self.go_to_home_pose()
-
+    self.open_gripper()
     #=====================================
     #======    Loading Turtelbot 
     #=====================================
@@ -307,6 +313,9 @@ class RobotManager(object):
     print(current_pose)
     print("")
 
+    return all_close(target_pose, current_pose, 0.1)
+
+
   def go_to_xyz_goal_with_constraint(self, target_xyz):
     # Copy class variables to local variables to make the web tutorials more clear.
     # In practice, you should use the class variables directly unless you have a good
@@ -353,7 +362,7 @@ class RobotManager(object):
     print(current_pose)
     print("")
 
-    return all_close(target_pose, current_pose, 0.01)
+    return all_close(target_pose, current_pose, 0.1)
 
   def get_nearest_available_point(self, target_point):
     print("============ Printing Nearest Point for Target Point: ")
@@ -638,25 +647,52 @@ def main():
                          )
 
       #TODO: Grasp pose
+      #TODO: Grasp pose
       input("Set Manipulator to Grasp {} Box".format(target_box))
-      if target_box in [1, 2]:
+      
+      if int(target_box) in [1, 2]:
+        print("upper")
         target_point, _ = robot.get_nearest_available_point(GraspState.upper_box_grasp)
       else:
+        print("down")
         target_point, _ = robot.get_nearest_available_point(GraspState.down_box_grasp)
-      robot.go_to_xyz_goal_with_constraint(target_point)
+      
+      closed = False
+      while not closed:
+        print(closed)
+        closed = robot.go_to_xyz_goal_with_constraint(target_point)
+        time.sleep(1)
 
-      #TODO: Grasp
+
+      #TODO: Grasp and move to stable state
+      input("Press Enter to Grasp Object")
       robot.close_gripper()
-      input("Press Enter to Continue the Project ")
+      target_point, _ = robot.get_nearest_available_point(GraspState.grasp_state)
+      closed = False
+      while not closed:
+        print(closed)
+        closed = robot.go_to_xyz_goal_with_constraint(target_point)
+        time.sleep(1)
+      
+      # input("Press Enter to Continue the Project ")
+      # print("============ 6. Move to Customer")
+      # #TODO: get x, y position of Customer
+      # #TODO: move to x, y
+      # input("Press Enter to Continue the Project ")
 
-      print("============ 6. Move to Customer")
-      #TODO: get x, y position of Customer
-      #TODO: move to x, y
-      input("Press Enter to Continue the Project ")
+      # print("============ 7. Place Object to Customer Hand")
+      # #TODO: Find Hand and place object to customer
+      input("Press Enter to Place Object to Customer")
+      target_point, _ = robot.get_nearest_available_point(GraspState.place_state)
+      closed = False
+      while not closed:
+        print(closed)
+        closed = robot.go_to_xyz_goal_with_constraint(target_point)
+        time.sleep(1)
+      robot.open_gripper()
 
-      print("============ 7. Place Object to Customer Hand")
-      #TODO: Find Hand and place object to customer
-      input("Press Enter to Continue the Project ")
+      robot.go_to_home_pose()
+      time.sleep(1)
 
 
   except rospy.ROSInterruptException:
