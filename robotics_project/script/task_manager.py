@@ -55,8 +55,8 @@ project_info_msg = """
 Project Description
 1. Initialize Robot
 2. Get Target Object Information from Customer
-3. Move to Storage Box
-4. Find Target Object
+3. Find Target Object
+4. Move to Storage Box
 5. Pick up Target Object
 6. Move to Customer
 7. Place Object to Customer Hand
@@ -774,7 +774,13 @@ def main():
       target_object = TARGET_INFO[target_key]
       print("Try to Find {}".format(target_object))
 
-      print("============ 3. Move to Storage Box")
+      print("============ 3. Find Target Object")
+      #TODO: Find Target objects x, y, z (or Grasp Point)
+      # target_box = cam.find_target_object(target_object)
+      target_box = input("Enter target box? ")
+      print("Find {} in {} Box".format(target_object, target_box))
+
+      print("============ 4. Move to Storage Box")
       # navigate to Storage Box
       robot.move_to_goal(goal_x=STORAGE_BOX_POSITION[0],
                          goal_y=STORAGE_BOX_POSITION[1],
@@ -782,27 +788,10 @@ def main():
       # Refine Turtlebot pose using UWB
       current_pos = uwb.get_tag2()
       related_pos = np.array(STORAGE_BOX_POSITION_UWB[:2]) - np.array(current_pos)
-      print("Refine {}".format(related_pos))
+      input("Have to Refine {}".format(related_pos))
       # robot.turtle_move(target_pos=related_pos,target_angle=0)
       
-      # is_approach = False
-      # while not is_approach:
-      #   key = input("Press a(linear), s(angle), d(end)")
-      #   if key == "a":
-      #     distance = input("Enter the distance to move x")
-      #     robot.turtle_move_x(float(distance))  
-      #   elif key == "s":
-      #     angle = input("Enter the angle to rotate")
-      #     robot.turtle_rotate(float(angle))
-      #   elif key == "d":
-      #     break
-
-      print("============ 4. Find Target Object")
-      #TODO: Find Target objects x, y, z (or Grasp Point)
-      # target_box = cam.find_target_object(target_object)
-      target_box = input("Enter target box? ")
-      print("Find {} in {} Box".format(target_object, target_box))
-
+    
       print("============ 5. Pick up Target Object")
       #TODO: approach to target object(until availbale to grasp)
       box_key = "box{}".format(target_box)
@@ -838,10 +827,12 @@ def main():
       tut_pos = uwb.get_tag1(related_map=True)
       cus_pos = uwb.get_tag2(related_map=True)
       distance = np.linalg.norm(np.array(tut_pos) - np.array(cus_pos))
-      while not distance < 0.3:
+      while not distance < 0.5:
+        print("Find Customer at {}".format(cus_pos))
+        print("Move to Customer...")
         tut_pos = uwb.get_tag1(related_map=True)
         cus_pos = uwb.get_tag2(related_map=True)
-        robot.move_to_goal(goal_x=cus_pos[0] ,
+        robot.move_to_goal(goal_x=cus_pos[0],
                            goal_y=cus_pos[1],
                            goal_angle=0
                            )
