@@ -4,9 +4,9 @@ import tf2_ros
 import tf2_msgs.msg
 import geometry_msgs.msg
 
-
-TRANS_X = 3.715
-TRANS_Y = 4.836
+# [ 3.62341204  4.78337659]
+TRANS_X = 3.89389802
+TRANS_Y = 4.69525672
 
 
 class FixedTFBroadcaster:

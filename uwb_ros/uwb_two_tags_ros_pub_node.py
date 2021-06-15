@@ -58,7 +58,7 @@ def on_message1(client, userdata, msg):
         pz = j
      if i == 'quality':
         posQ = j
-        print ("Tag1: %0.2f, %0.2f, %0.2f, %d" %(float(px), float(py), float(pz), int(posQ)))
+        #print ("Tag1: %0.2f, %0.2f, %0.2f, %d" %(float(px), float(py), float(pz), int(posQ)))
       #   global_px.append(px)
       #   global_py.append(py)
       #   if len(global_px) < 100:
@@ -97,7 +97,7 @@ def on_message2(client, userdata, msg):
         pz = j
      if i == 'quality':
         posQ = j
-        print ("Tag2: %0.2f, %0.2f, %0.2f, %d" %(float(px), float(py), float(pz), int(posQ)) )    
+        # print ("Tag2: %0.2f, %0.2f, %0.2f, %d" %(float(px), float(py), float(pz), int(posQ)) )    
         loc_msg = PoseStamped()
         loc_msg.header.frame_id = UWB_FRAME
         loc_msg.header.stamp = rospy.Time.now()
