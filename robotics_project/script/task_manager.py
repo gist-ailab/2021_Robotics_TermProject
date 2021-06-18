@@ -90,11 +90,13 @@ TARGET_INFO = {
   "r": "object_4"
 }
 
+#=====================================
+#======    PREDIFINED
+#=====================================
 
 # STORAGE_BOX_POSITION = [0, -1.75, 270] # x, y, angle(GAZEBO)
 STORAGE_BOX_POSITION = [0, 0, 0] # x, y, angle (REAL)
 STORAGE_BOX_POSITION_UWB = [3.62341204, 4.78337659, 0] # x, y, angle (UWB)
-
 
 SCRIPT_ROOT = os.path.dirname(os.path.abspath(__file__))
 XZ_WORKSPACE_FILE = join(SCRIPT_ROOT, "available_workspace.csv")
@@ -197,8 +199,12 @@ class GraspAction:
     ]
   }
 
+#=====================================
+#======    MANAGERS
+#=====================================
+
 class RobotManager(object):
-  def __init__(self, uwb, localization=True):
+  def __init__(self, uwb):
     super(RobotManager, self).__init__()
     
     moveit_commander.roscpp_initialize(sys.argv)
@@ -232,7 +238,6 @@ class RobotManager(object):
     print("")                         
     
     # Misc variables
-    self.box_name = ''
     self.robot = robot
     self.scene = scene
     self.arm_group = arm_group
@@ -257,10 +262,6 @@ class RobotManager(object):
     self.turtle_move_client = actionlib.SimpleActionClient('move_base',MoveBaseAction)
     
     self.turtle_stop()
-    if localization==True:
-      self.localization()
-    else:
-      pass
     
   #region Manipulator
   def get_available_workspace(self):
@@ -516,9 +517,15 @@ class RobotManager(object):
     print(initial_pose)
     self.turtle_initial_pose_pub.publish(initial_pose)
     current_pose = rospy.wait_for_message("/amcl_pose", PoseWithCovarianceStamped)
-    while not all_close(initial_pose.pose.pose, current_pose.pose.pose, tolerance=0.1):
+    start = time.time()
+    current = time.time()
+    delay = current - start
+    # Try to initialize position of turtlebot for 5sec
+    while not all_close(initial_pose.pose.pose, current_pose.pose.pose, tolerance=0.1) and delay < 5:
       current_pose = rospy.wait_for_message("/amcl_pose", PoseWithCovarianceStamped)
       self.turtle_initial_pose_pub.publish(initial_pose)
+      current = time.time()
+      delay = current - start
 
   def localization(self):
     print(localization_info_msg)
@@ -526,6 +533,8 @@ class RobotManager(object):
     GL=rospy.ServiceProxy("global_localization",Empty)
     GL()
     angle_list = [180, -180, 90, -90]
+
+    # initialize pose
     self.set_initial_pose()
       
     for angle in angle_list:
@@ -552,24 +561,6 @@ class RobotManager(object):
         pass
       self.turtle_stop()
       self.turtle_rotate(angle)
-      # # Rotate angle
-      # self.turtle_state_update()
-      # start_rad = self.turtle_state.rpy[2]
-      # delta_rad = 0
-      # objective_rad = angle * np.pi / 180
-      # if objective_rad > 0:
-      #   angular_vel = ANGULAR_VEL
-      # elif objective_rad < 0:
-      #   angular_vel = -ANGULAR_VEL
-      # else:
-      #   angular_vel = 0
-      # self.set_turtlebot_velocity(linear_velocity=0,
-      #                             angular_velocity=angular_vel)
-      # while True:
-      #   self.turtle_state_update()
-      #   delta_rad = self.turtle_state.rpy[2] - start_rad
-      #   if abs(delta_rad) > abs(objective_rad):
-      #     break
       self.turtle_stop()
     self.turtle_stop()
     
@@ -756,15 +747,13 @@ class UWBManager(object):
       current_y -= self.trans_y
     return current_x, current_y
   
-
-
 def main():
   try:
     rospy.init_node('task_manager', anonymous=True)
     print(project_info_msg)
     print("============ 1. Initialize robot")
     uwb = UWBManager()
-    robot = RobotManager(uwb, localization=True) # turtlebot with open manipulator
+    robot = RobotManager(uwb)
     cam = CameraManager() # realsense
     uwb = UWBManager()
     while True:
@@ -785,15 +774,9 @@ def main():
       robot.move_to_goal(goal_x=STORAGE_BOX_POSITION[0],
                          goal_y=STORAGE_BOX_POSITION[1],
                          goal_angle=STORAGE_BOX_POSITION[2])
-      # Refine Turtlebot pose using UWB
-      current_pos = uwb.get_tag2()
-      related_pos = np.array(STORAGE_BOX_POSITION_UWB[:2]) - np.array(current_pos)
-      input("Have to Refine {}".format(related_pos))
-      # robot.turtle_move(target_pos=related_pos,target_angle=0)
-      
-    
+      # Refine Turtlebot pose
+      input("Have to Refine the turtlebot pose")
       print("============ 5. Pick up Target Object")
-      #TODO: approach to target object(until availbale to grasp)
       box_key = "box{}".format(target_box)
       for action, data in GraspAction.action_list[box_key]:
         print("State {}...".format(action))
@@ -827,8 +810,8 @@ def main():
       tut_pos = uwb.get_tag1(related_map=True)
       cus_pos = uwb.get_tag2(related_map=True)
       distance = np.linalg.norm(np.array(tut_pos) - np.array(cus_pos))
-      while not distance < 0.5:
-        print("Find Customer at {}".format(cus_pos))
+      while not distance < 0.7:
+        print("Find Customer at {} {}".format(cus_pos), distance)
         print("Move to Customer...")
         tut_pos = uwb.get_tag1(related_map=True)
         cus_pos = uwb.get_tag2(related_map=True)
@@ -838,8 +821,6 @@ def main():
                            )
         distance = np.linalg.norm(np.array(tut_pos) - np.array(cus_pos))
 
-      # print("============ 7. Place Object to Customer Hand")
-      # #TODO: Find Hand and place object to customer
       input("Press Enter to Place Object to Customer")
       target_point, _ = robot.get_nearest_available_point(GraspState.place_state)
       closed = False
