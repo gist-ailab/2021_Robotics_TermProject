@@ -59,7 +59,7 @@ Project Description
 4. Move to Storage Box
 5. Pick up Target Object
 6. Move to Customer
-7. Place Object to Customer Hand
+7. Place Object to Customer
 *Repeat 2~7 Process Until Program Down
 
 Press Ctrl-D to exit at any time
